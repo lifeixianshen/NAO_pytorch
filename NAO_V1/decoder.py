@@ -90,19 +90,16 @@ class Decoder(nn.Module):
         return predicted_softmax, hidden, attn
     
     def forward(self, x, encoder_hidden=None, encoder_outputs=None):
-        ret_dict = dict()
-        ret_dict[Decoder.KEY_ATTN_SCORE] = list()
-        if x is None:
-            inference = True
-        else:
-            inference = False
+        ret_dict = {}
+        ret_dict[Decoder.KEY_ATTN_SCORE] = []
+        inference = x is None
         x, batch_size, length = self._validate_args(x, encoder_hidden, encoder_outputs)
         assert length == self.length
         decoder_hidden = self._init_state(encoder_hidden)
         decoder_outputs = []
         sequence_symbols = []
         lengths = np.array([length] * batch_size)
-        
+
         def decode(step, step_output, step_attn):
             decoder_outputs.append(step_output)
             ret_dict[Decoder.KEY_ATTN_SCORE].append(step_attn)
@@ -111,16 +108,16 @@ class Decoder(nn.Module):
                 symbols = decoder_outputs[-1][:, 1:index].topk(1)[1] + 1
             else:  # sample operation, should be in [7, 11]
                 symbols = decoder_outputs[-1][:, 7:].topk(1)[1] + 7
-            
+
             sequence_symbols.append(symbols)
-            
+
             eos_batches = symbols.data.eq(self.eos_id)
             if eos_batches.dim() > 0:
                 eos_batches = eos_batches.cpu().view(-1).numpy()
                 update_idx = ((lengths > step) & eos_batches) != 0
                 lengths[update_idx] = len(sequence_symbols)
             return symbols
-        
+
         decoder_input = x[:, 0].unsqueeze(1)
         for di in range(length):
             if not inference:
@@ -129,10 +126,10 @@ class Decoder(nn.Module):
             step_output = decoder_output.squeeze(1)
             symbols = decode(di, step_output, step_attn)
             decoder_input = symbols
-        
+
         ret_dict[Decoder.KEY_SEQUENCE] = sequence_symbols
         ret_dict[Decoder.KEY_LENGTH] = lengths.tolist()
-        
+
         return decoder_outputs, decoder_hidden, ret_dict
     
     def _init_state(self, encoder_hidden):
@@ -140,7 +137,7 @@ class Decoder(nn.Module):
         if encoder_hidden is None:
             return None
         if isinstance(encoder_hidden, tuple):
-            encoder_hidden = tuple([h for h in encoder_hidden])
+            encoder_hidden = tuple(list(encoder_hidden))
         else:
             encoder_hidden = encoder_hidden
         return encoder_hidden
@@ -148,23 +145,19 @@ class Decoder(nn.Module):
     def _validate_args(self, x, encoder_hidden, encoder_outputs):
         if encoder_outputs is None:
             raise ValueError("Argument encoder_outputs cannot be None when attention is used.")
-        
+
         # inference batch size
         if x is None and encoder_hidden is None:
             batch_size = 1
         else:
-            if x is not None:
-                batch_size = x.size(0)
-            else:
-                batch_size = encoder_hidden[0].size(1)
-        
+            batch_size = x.size(0) if x is not None else encoder_hidden[0].size(1)
         # set default input and max decoding length
         if x is None:
             x = torch.LongTensor([self.sos_id] * batch_size).view(batch_size, 1).cuda()
             max_length = self.length
         else:
             max_length = x.size(1)
-        
+
         return x, batch_size, max_length
     
     def eval(self):

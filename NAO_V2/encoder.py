@@ -30,22 +30,30 @@ class Encoder(nn.Module):
         self.source_length = source_length
         self.mlp_layers = mlp_layers
         self.mlp_hidden_size = mlp_hidden_size
-        
+
         self.embedding = nn.Embedding(self.vocab_size, self.emb_size)
         self.dropout = nn.Dropout(dropout)
         self.rnn = nn.LSTM(self.hidden_size, self.hidden_size, self.layers, batch_first=True, dropout=dropout)
         self.mlp = nn.Sequential()
         for i in range(self.mlp_layers):
             if i == 0:
-                self.mlp.add_module('layer_{}'.format(i), nn.Sequential(
-                    nn.Linear(self.hidden_size, self.mlp_hidden_size),
-                    nn.ReLU(inplace=False),
-                    nn.Dropout(p=mlp_dropout)))
+                self.mlp.add_module(
+                    f'layer_{i}',
+                    nn.Sequential(
+                        nn.Linear(self.hidden_size, self.mlp_hidden_size),
+                        nn.ReLU(inplace=False),
+                        nn.Dropout(p=mlp_dropout),
+                    ),
+                )
             else:
-                self.mlp.add_module('layer_{}'.format(i), nn.Sequential(
-                    nn.Linear(self.mlp_hidden_size, self.mlp_hidden_size),
-                    nn.ReLU(inplace=False),
-                    nn.Dropout(p=mlp_dropout)))
+                self.mlp.add_module(
+                    f'layer_{i}',
+                    nn.Sequential(
+                        nn.Linear(self.mlp_hidden_size, self.mlp_hidden_size),
+                        nn.ReLU(inplace=False),
+                        nn.Dropout(p=mlp_dropout),
+                    ),
+                )
         self.regressor = nn.Linear(self.hidden_size if self.mlp_layers == 0 else self.mlp_hidden_size, 1)
     
     def forward(self, x):
@@ -77,7 +85,7 @@ class Encoder(nn.Module):
         elif direction == '-':
             new_encoder_outputs = encoder_outputs - predict_lambda * grads_on_outputs
         else:
-            raise ValueError('Direction must be + or -, got {} instead'.format(direction))
+            raise ValueError(f'Direction must be + or -, got {direction} instead')
         new_encoder_outputs = F.normalize(new_encoder_outputs, 2, dim=-1)
         new_arch_emb = torch.mean(new_encoder_outputs, dim=1)
         new_arch_emb = F.normalize(new_arch_emb, 2, dim=-1)

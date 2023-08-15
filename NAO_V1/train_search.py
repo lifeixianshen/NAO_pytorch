@@ -95,8 +95,7 @@ class CrossEntropyLabelSmooth(nn.Module):
         log_probs = self.logsoftmax(inputs)
         targets = torch.zeros_like(log_probs).scatter_(1, targets.unsqueeze(1), 1)
         targets = (1 - self.epsilon) * targets + self.epsilon / self.num_classes
-        loss = (-targets * log_probs).mean(0).sum()
-        return loss
+        return (-targets * log_probs).mean(0).sum()
 
 
 def get_builder(dataset):
@@ -336,7 +335,7 @@ def train_and_evaluate_top_on_cifar10(archs, train_queue, valid_queue):
         objs.reset()
         top1.reset()
         top5.reset()
-        logging.info('Train and evaluate the {} arch'.format(i+1))
+        logging.info(f'Train and evaluate the {i + 1} arch')
         model = NASNetworkCIFAR(args, 10, args.child_layers, args.child_nodes, args.child_channels, 0.6, 0.8,
                         True, args.steps, arch)
         model = model.cuda()
@@ -366,13 +365,13 @@ def train_and_evaluate_top_on_cifar10(archs, train_queue, valid_queue):
                 loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), args.child_grad_bound)
                 optimizer.step()
-            
+
                 prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
                 n = input.size(0)
                 objs.update(loss.data, n)
                 top1.update(prec1.data, n)
                 top5.update(prec5.data, n)
-            
+
                 if (step+1) % 100 == 0:
                     logging.info('Train epoch %03d %03d loss %e top1 %f top5 %f', e+1, step+1, objs.avg, top1.avg, top5.avg)
         objs.reset()
@@ -383,16 +382,16 @@ def train_and_evaluate_top_on_cifar10(archs, train_queue, valid_queue):
             for step, (input, target) in enumerate(valid_queue):
                 input = input.cuda()
                 target = target.cuda()
-            
+
                 logits, _ = model(input)
                 loss = eval_criterion(logits, target)
-            
+
                 prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
                 n = input.size(0)
                 objs.update(loss.data, n)
                 top1.update(prec1.data, n)
                 top5.update(prec5.data, n)
-            
+
                 if (step+1) % 100 == 0:
                     logging.info('valid %03d %e %f %f', step+1, objs.avg, top1.avg, top5.avg)
         res.append(top1.avg)
@@ -410,7 +409,7 @@ def train_and_evaluate_top_on_cifar100(archs, train_queue, valid_queue):
         objs.reset()
         top1.reset()
         top5.reset()
-        logging.info('Train and evaluate the {} arch'.format(i+1))
+        logging.info(f'Train and evaluate the {i + 1} arch')
         model = NASNetworkCIFAR(args, 100, args.child_layers, args.child_nodes, args.child_channels, 0.6, 0.8,
                         True, args.steps, arch)
         model = model.cuda()
@@ -440,13 +439,13 @@ def train_and_evaluate_top_on_cifar100(archs, train_queue, valid_queue):
                 loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), args.child_grad_bound)
                 optimizer.step()
-            
+
                 prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
                 n = input.size(0)
                 objs.update(loss.data, n)
                 top1.update(prec1.data, n)
                 top5.update(prec5.data, n)
-            
+
                 if (step+1) % 100 == 0:
                     logging.info('Train %3d %03d loss %e top1 %f top5 %f', e+1, step+1, objs.avg, top1.avg, top5.avg)
         objs.reset()
@@ -457,16 +456,16 @@ def train_and_evaluate_top_on_cifar100(archs, train_queue, valid_queue):
             for step, (input, target) in enumerate(valid_queue):
                 input = input.cuda()
                 target = target.cuda()
-            
+
                 logits, _ = model(input)
                 loss = eval_criterion(logits, target)
-            
+
                 prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
                 n = input.size(0)
                 objs.update(loss.data, n)
                 top1.update(prec1.data, n)
                 top5.update(prec5.data, n)
-            
+
                 if (step+1) % 100 == 0:
                     logging.info('valid %03d %e %f %f', step+1, objs.avg, top1.avg, top5.avg)
         res.append(top1.avg)
@@ -484,7 +483,7 @@ def train_and_evaluate_top_on_imagenet(archs, train_queue, valid_queue):
         objs.reset()
         top1.reset()
         top5.reset()
-        logging.info('Train and evaluate the {} arch'.format(i+1))
+        logging.info(f'Train and evaluate the {i + 1} arch')
         model = NASNetworkImageNet(args, 1000, args.child_layers, args.child_nodes, args.child_channels, 1.0, 1.0,
                         True, args.steps, arch)
         model = model.cuda()
@@ -509,16 +508,16 @@ def train_and_evaluate_top_on_imagenet(archs, train_queue, valid_queue):
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), args.child_grad_bound)
             optimizer.step()
-            
+
             prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
             n = input.size(0)
             objs.update(loss.data, n)
             top1.update(prec1.data, n)
             top5.update(prec5.data, n)
-            
+
             if (step+1) % 100 == 0:
                 logging.info('Train %03d loss %e top1 %f top5 %f', step+1, objs.avg, top1.avg, top5.avg)
-            if step+1 == 500:
+            if step == 499:
                 break
 
         objs.reset()
@@ -529,16 +528,16 @@ def train_and_evaluate_top_on_imagenet(archs, train_queue, valid_queue):
             for step, (input, target) in enumerate(valid_queue):
                 input = input.cuda()
                 target = target.cuda()
-            
+
                 logits, _ = model(input)
                 loss = eval_criterion(logits, target)
-            
+
                 prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
                 n = input.size(0)
                 objs.update(loss.data, n)
                 top1.update(prec1.data, n)
                 top5.update(prec5.data, n)
-            
+
                 if (step+1) % 100 == 0:
                     logging.info('valid %03d %e %f %f', step+1, objs.avg, top1.avg, top5.avg)
         res.append(top1.avg)
@@ -550,17 +549,17 @@ def nao_train(train_queue, model, optimizer):
     mse = utils.AvgrageMeter()
     nll = utils.AvgrageMeter()
     model.train()
-    for step, sample in enumerate(train_queue):
+    for sample in train_queue:
         encoder_input = sample['encoder_input']
         encoder_target = sample['encoder_target']
         decoder_input = sample['decoder_input']
         decoder_target = sample['decoder_target']
-        
+
         encoder_input = encoder_input.cuda()
         encoder_target = encoder_target.cuda().requires_grad_()
         decoder_input = decoder_input.cuda()
         decoder_target = decoder_target.cuda()
-        
+
         optimizer.zero_grad()
         predict_value, log_prob, arch = model(encoder_input, decoder_input)
         loss_1 = F.mse_loss(predict_value.squeeze(), encoder_target.squeeze())
@@ -569,12 +568,12 @@ def nao_train(train_queue, model, optimizer):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.controller_grad_bound)
         optimizer.step()
-        
+
         n = encoder_input.size(0)
         objs.update(loss.data, n)
         mse.update(loss_1.data, n)
         nll.update(loss_2.data, n)
-        
+
     return objs.avg, mse.avg, nll.avg
 
 
@@ -585,15 +584,15 @@ def nao_valid(queue, model):
     archs = []
     with torch.no_grad():
         model.eval()
-        for step, sample in enumerate(queue):
+        for sample in queue:
             encoder_input = sample['encoder_input']
             encoder_target = sample['encoder_target']
             decoder_target = sample['decoder_target']
-            
+
             encoder_input = encoder_input.cuda()
             encoder_target = encoder_target.cuda()
             decoder_target = decoder_target.cuda()
-            
+
             predict_value, logits, arch = model(encoder_input)
             n = encoder_input.size(0)
             inputs += encoder_input.data.squeeze().tolist()
@@ -608,7 +607,7 @@ def nao_valid(queue, model):
 def nao_infer(queue, model, step, direction='+'):
     new_arch_list = []
     model.eval()
-    for i, sample in enumerate(queue):
+    for sample in queue:
         encoder_input = sample['encoder_input']
         encoder_input = encoder_input.cuda()
         model.zero_grad()

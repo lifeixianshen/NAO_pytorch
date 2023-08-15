@@ -169,9 +169,7 @@ class WSBN(nn.Module):
                 self.bias[i].data.zero_()
 
     def forward(self, x, x_id, bn_train=False):
-        training = self.training
-        if bn_train:
-            training = True
+        training = True if bn_train else self.training
         return F.batch_norm(
             x, self.running_mean, self.running_var, self.weight[x_id], self.bias[x_id],
             training, self.momentum, self.eps)
@@ -206,15 +204,35 @@ class WSSepConv(nn.Module):
         self.C_out = C_out
         self.C_in = C_in
         self.padding = padding
-        
+
         self.relu1 = nn.ReLU(inplace=INPLACE)
-        self.W1_depthwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_in, 1, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
-        self.W1_pointwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, 1, 1)) for i in range(num_possible_inputs)])
+        self.W1_depthwise = nn.ParameterList(
+            [
+                nn.Parameter(torch.Tensor(C_in, 1, kernel_size, kernel_size))
+                for _ in range(num_possible_inputs)
+            ]
+        )
+        self.W1_pointwise = nn.ParameterList(
+            [
+                nn.Parameter(torch.Tensor(C_out, C_in, 1, 1))
+                for _ in range(num_possible_inputs)
+            ]
+        )
         self.bn1 = WSBN(num_possible_inputs, C_in, affine=affine)
 
         self.relu2 = nn.ReLU(inplace=INPLACE)
-        self.W2_depthwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_in, 1, kernel_size, kernel_size)) for i in range(num_possible_inputs)])
-        self.W2_pointwise = nn.ParameterList([nn.Parameter(torch.Tensor(C_out, C_in, 1, 1)) for i in range(num_possible_inputs)])
+        self.W2_depthwise = nn.ParameterList(
+            [
+                nn.Parameter(torch.Tensor(C_in, 1, kernel_size, kernel_size))
+                for _ in range(num_possible_inputs)
+            ]
+        )
+        self.W2_pointwise = nn.ParameterList(
+            [
+                nn.Parameter(torch.Tensor(C_out, C_in, 1, 1))
+                for _ in range(num_possible_inputs)
+            ]
+        )
         self.bn2 = WSBN(num_possible_inputs, C_in, affine=affine)
     
     def forward(self, x, x_id, stride=1, bn_train=False):
@@ -332,8 +350,7 @@ class FinalCombine(nn.Module):
         for i in self.concat:
             if i in self.concat_fac_op_dict:
                 states[i] = self.ops[self.concat_fac_op_dict[i]](states[i], bn_train)
-        out = torch.cat([states[i] for i in self.concat], dim=1)
-        return out
+        return torch.cat([states[i] for i in self.concat], dim=1)
 
 
 OPERATIONS = {

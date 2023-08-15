@@ -61,7 +61,7 @@ def nao_train(train_queue, model, optimizer):
     mse = utils.AvgrageMeter()
     nll = utils.AvgrageMeter()
     model.train()
-    for step, sample in enumerate(train_queue):
+    for sample in train_queue:
         encoder_input = sample['encoder_input']
         encoder_target = sample['encoder_target']
         decoder_input = sample['decoder_input']
@@ -71,7 +71,7 @@ def nao_train(train_queue, model, optimizer):
         encoder_target = encoder_target.cuda().requires_grad_()
         decoder_input = decoder_input.cuda()
         decoder_target = decoder_target.cuda()
-        
+
         optimizer.zero_grad()
         predict_value, log_prob, arch = model(encoder_input, decoder_input)
         loss_1 = F.mse_loss(predict_value.squeeze(), encoder_target.squeeze())
@@ -80,12 +80,12 @@ def nao_train(train_queue, model, optimizer):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_bound)
         optimizer.step()
-        
+
         n = encoder_input.size(0)
         objs.update(loss.data, n)
         mse.update(loss_1.data, n)
         nll.update(loss_2.data, n)
-    
+
     return objs.avg, mse.avg, nll.avg
 
 
@@ -95,15 +95,15 @@ def nao_valid(queue, model):
     mse = utils.AvgrageMeter()
     with torch.no_grad():
         model.eval()
-        for step, sample in enumerate(queue):
+        for sample in queue:
             encoder_input = sample['encoder_input']
             encoder_target = sample['encoder_target']
             decoder_target = sample['decoder_target']
-            
+
             encoder_input = encoder_input.cuda()
             encoder_target = encoder_target.cuda()
             decoder_target = decoder_target.cuda()
-            
+
             predict_value, logits, arch = model(encoder_input)
             n = encoder_input.size(0)
             pairwise_acc = utils.pairwise_accuracy(encoder_target.data.squeeze().tolist(),
@@ -118,7 +118,7 @@ def nao_valid(queue, model):
 def nao_infer(queue, model, step, direction='+'):
     new_arch_list = []
     model.eval()
-    for i, sample in enumerate(queue):
+    for sample in queue:
         encoder_input = sample['encoder_input']
         encoder_input = encoder_input.cuda()
         model.zero_grad()
@@ -130,7 +130,7 @@ def main():
     if not torch.cuda.is_available():
         logging.info('No GPU found!')
         sys.exit(1)
-    
+
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -139,7 +139,7 @@ def main():
     cudnn.enabled = True
     cudnn.benchmark = False
     cudnn.deterministic = True
-    
+
     logging.info("Args = %s", args)
 
     nao = NAO(
@@ -162,10 +162,10 @@ def main():
     logging.info("param size = %fMB", utils.count_parameters_in_MB(nao))
     nao = nao.cuda()
 
-    with open(os.path.join(args.output_dir, 'arch_pool.{}'.format(args.iteration))) as f:
+    with open(os.path.join(args.output_dir, f'arch_pool.{args.iteration}')) as f:
         arch_pool = f.read().splitlines()
         arch_pool = list(map(utils.build_dag, arch_pool))
-    with open(os.path.join(args.output_dir, 'arch_pool.{}.perf'.format(args.iteration))) as f:
+    with open(os.path.join(args.output_dir, f'arch_pool.{args.iteration}.perf')) as f:
         arch_pool_valid_acc = f.read().splitlines()
         arch_pool_valid_acc = list(map(float, arch_pool_valid_acc))
 
@@ -214,7 +214,7 @@ def main():
     top_archs = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool[:args.generate_topk]))
     nao_infer_dataset = utils.NAODataset(top_archs, None, False)
     nao_infer_queue = torch.utils.data.DataLoader(nao_infer_dataset, batch_size=len(nao_infer_dataset), shuffle=False, pin_memory=True)
-        
+
     while len(new_archs) < args.new_arch:
         predict_step_size += 1
         logging.info('Generate new architectures with step size %d', predict_step_size)
@@ -230,11 +230,11 @@ def main():
 
     logging.info("Generate %d new archs", len(new_archs))
     new_arch_pool = list(map(lambda x: utils.parse_seq_to_arch(x, 2), new_archs))
-    new_arch_pool = new_arch_pool + arch_pool[:args.remain_topk]
-    with open(os.path.join(args.output_dir, 'new_arch_pool.{}'.format(args.iteration)), 'w') as f:
+    new_arch_pool += arch_pool[:args.remain_topk]
+    with open(os.path.join(args.output_dir, f'new_arch_pool.{args.iteration}'), 'w') as f:
         for arch in new_arch_pool:
             arch = ' '.join(map(str, arch[0] + arch[1]))
-            f.write('{}\n'.format(arch))
+            f.write(f'{arch}\n')
     logging.info('Finish training!')
 
 

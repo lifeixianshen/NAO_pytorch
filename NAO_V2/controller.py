@@ -71,5 +71,4 @@ class NAO(nn.Module):
             input_variable, predict_lambda, direction=direction)
         new_encoder_hidden = (new_arch_emb.unsqueeze(0), new_arch_emb.unsqueeze(0))
         decoder_outputs, decoder_hidden, ret = self.decoder(None, new_encoder_hidden, new_encoder_outputs)
-        new_arch = torch.stack(ret['sequence'], 0).permute(1, 0, 2)
-        return new_arch
+        return torch.stack(ret['sequence'], 0).permute(1, 0, 2)

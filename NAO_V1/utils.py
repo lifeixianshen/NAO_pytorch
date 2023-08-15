@@ -19,9 +19,7 @@ B=5
 def item(tensor):
     if hasattr(tensor, 'item'):
         return tensor.item()
-    if hasattr(tensor, '__getitem__'):
-        return tensor[0]
-    return tensor
+    return tensor[0] if hasattr(tensor, '__getitem__') else tensor
 
 
 class AvgrageMeter(object):
@@ -153,7 +151,7 @@ class InMemoryDataset(data.Dataset):
                     fnames = sorted(fnames)
                     num_files = len(fnames)
                     threads = []
-                    res = [[] for i in range(num_workers)]
+                    res = [[] for _ in range(num_workers)]
                     num_per_worker = num_files // num_workers
                     for i in range(num_workers):
                         start_index = num_per_worker * i
@@ -180,9 +178,9 @@ class InMemoryDataset(data.Dataset):
         return sample, target
     
     def __repr__(self):
-        fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
-        fmt_str += '    Number of datapoints: {}\n'.format(self.__len__())
-        fmt_str += '    Root Location: {}\n'.format(self.path)
+        fmt_str = f'Dataset {self.__class__.__name__}' + '\n'
+        fmt_str += f'    Number of datapoints: {self.__len__()}\n'
+        fmt_str += f'    Root Location: {self.path}\n'
         tmp = '    Transforms (if any): '
         fmt_str += '{0}{1}\n'.format(tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
         tmp = '    Target Transforms (if any): '
@@ -226,9 +224,9 @@ class ZipDataset(data.Dataset):
         return sample, target
     
     def __repr__(self):
-        fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
-        fmt_str += '    Number of datapoints: {}\n'.format(self.__len__())
-        fmt_str += '    Root Location: {}\n'.format(self.path)
+        fmt_str = f'Dataset {self.__class__.__name__}' + '\n'
+        fmt_str += f'    Number of datapoints: {self.__len__()}\n'
+        fmt_str += f'    Root Location: {self.path}\n'
         tmp = '    Transforms (if any): '
         fmt_str += '{0}{1}\n'.format(tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
         tmp = '    Target Transforms (if any): '
@@ -237,9 +235,7 @@ class ZipDataset(data.Dataset):
     
     @staticmethod
     def is_directory(fname):
-        if fname.startswith('n') and fname.endswith('/'):
-            return True
-        return False
+        return bool(fname.startswith('n') and fname.endswith('/'))
     
     @staticmethod
     def get_target(fname):
@@ -292,7 +288,7 @@ class InMemoryZipDataset(data.Dataset):
         else:
             num_files = len(fnames)
             threads = []
-            res = [[] for i in range(num_workers)]
+            res = [[] for _ in range(num_workers)]
             num_per_worker = num_files // num_workers
             for i in range(num_workers):
                 start_index = num_per_worker * i
@@ -320,9 +316,9 @@ class InMemoryZipDataset(data.Dataset):
         return sample, target
     
     def __repr__(self):
-        fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
-        fmt_str += '    Number of datapoints: {}\n'.format(self.__len__())
-        fmt_str += '    Root Location: {}\n'.format(self.path)
+        fmt_str = f'Dataset {self.__class__.__name__}' + '\n'
+        fmt_str += f'    Number of datapoints: {self.__len__()}\n'
+        fmt_str += f'    Root Location: {self.path}\n'
         tmp = '    Transforms (if any): '
         fmt_str += '{0}{1}\n'.format(tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
         tmp = '    Target Transforms (if any): '
@@ -331,9 +327,7 @@ class InMemoryZipDataset(data.Dataset):
     
     @staticmethod
     def is_directory(fname):
-        if fname.startswith('n') and fname.endswith('/'):
-            return True
-        return False
+        return bool(fname.startswith('n') and fname.endswith('/'))
     
     @staticmethod
     def get_target(fname):
@@ -362,16 +356,14 @@ class NAODataset(torch.utils.data.Dataset):
     
     def __getitem__(self, index):
         encoder_input = self.inputs[index]
-        encoder_target = None
-        if self.targets is not None:
-            encoder_target = [self.targets[index]]
+        encoder_target = [self.targets[index]] if self.targets is not None else None
         if self.swap:
             a = np.random.randint(0, 5)
             b = np.random.randint(0, 5)
             encoder_input = encoder_input[:4 * a] + encoder_input[4 * a + 2:4 * a + 4] + \
-                            encoder_input[4 * a:4 * a + 2] + encoder_input[4 * (a + 1):20 + 4 * b] + \
-                            encoder_input[20 + 4 * b + 2:20 + 4 * b + 4] + encoder_input[20 + 4 * b:20 + 4 * b + 2] + \
-                            encoder_input[20 + 4 * (b + 1):]
+                                encoder_input[4 * a:4 * a + 2] + encoder_input[4 * (a + 1):20 + 4 * b] + \
+                                encoder_input[20 + 4 * b + 2:20 + 4 * b + 4] + encoder_input[20 + 4 * b:20 + 4 * b + 2] + \
+                                encoder_input[20 + 4 * (b + 1):]
         if self.train:
             decoder_input = [self.sos_id] + encoder_input[:-1]
             sample = {
@@ -416,7 +408,7 @@ def save(model_path, args, model, epoch, step, optimizer, best_acc_top1, is_best
         'optimizer': optimizer.state_dict(),
         'best_acc_top1': best_acc_top1,
     }
-    filename = os.path.join(model_path, 'checkpoint{}.pt'.format(epoch))
+    filename = os.path.join(model_path, f'checkpoint{epoch}.pt')
     torch.save(state_dict, filename)
     newest_filename = os.path.join(model_path, 'checkpoint.pt')
     shutil.copyfile(filename, newest_filename)
@@ -442,7 +434,7 @@ def load(model_path):
 def create_exp_dir(path, scripts_to_save=None):
     if not os.path.exists(path):
         os.makedirs(path)
-        print('Experiment dir : {}'.format(path))
+        print(f'Experiment dir : {path}')
 
     if scripts_to_save is not None:
         os.makedirs(os.path.join(path, 'scripts'), exist_ok=True)
@@ -453,15 +445,14 @@ def create_exp_dir(path, scripts_to_save=None):
 
 def sample_arch(arch_pool, prob=None):
     N = len(arch_pool)
-    indices = [i for i in range(N)]
+    indices = list(range(N))
     if prob is not None:
         prob = np.array(prob, dtype=np.float32)
         prob = prob / prob.sum()
         index = np.random.choice(indices, p=prob)
     else:
         index = np.random.choice(indices)
-    arch = arch_pool[index]
-    return arch
+    return arch_pool[index]
 
 
 def generate_arch(n, num_nodes, num_ops=7):

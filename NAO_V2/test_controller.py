@@ -57,7 +57,7 @@ def nao_train(train_queue, model, optimizer):
     mse = utils.AvgrageMeter()
     nll = utils.AvgrageMeter()
     model.train()
-    for step, sample in enumerate(train_queue):
+    for sample in train_queue:
         encoder_input = sample['encoder_input']
         encoder_target = sample['encoder_target']
         decoder_input = sample['decoder_input']
@@ -67,7 +67,7 @@ def nao_train(train_queue, model, optimizer):
         encoder_target = encoder_target.cuda().requires_grad_()
         decoder_input = decoder_input.cuda()
         decoder_target = decoder_target.cuda()
-        
+
         optimizer.zero_grad()
         predict_value, log_prob, arch = model(encoder_input, decoder_input)
         loss_1 = F.mse_loss(predict_value.squeeze(), encoder_target.squeeze())
@@ -76,12 +76,12 @@ def nao_train(train_queue, model, optimizer):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.controller_grad_bound)
         optimizer.step()
-        
+
         n = encoder_input.size(0)
         objs.update(loss.data, n)
         mse.update(loss_1.data, n)
         nll.update(loss_2.data, n)
-    
+
     return objs.avg, mse.avg, nll.avg
 
 
@@ -90,15 +90,15 @@ def nao_valid(queue, model):
     hs = utils.AvgrageMeter()
     with torch.no_grad():
         model.eval()
-        for step, sample in enumerate(queue):
+        for sample in queue:
             encoder_input = sample['encoder_input']
             encoder_target = sample['encoder_target']
             decoder_target = sample['decoder_target']
-            
+
             encoder_input = encoder_input.cuda()
             encoder_target = encoder_target.cuda()
             decoder_target = decoder_target.cuda()
-            
+
             predict_value, logits, arch = model(encoder_input)
             n = encoder_input.size(0)
             pairwise_acc = utils.pairwise_accuracy(encoder_target.data.squeeze().tolist(),
@@ -112,7 +112,7 @@ def nao_valid(queue, model):
 def nao_infer(queue, model, step):
     new_arch_list = []
     model.eval()
-    for i, sample in enumerate(queue):
+    for sample in queue:
         encoder_input = sample['encoder_input']
         encoder_input = encoder_input.cuda()
         model.zero_grad()
@@ -125,8 +125,10 @@ def main():
     valid_arch_pool = utils.generate_arch(100, 5, 5)
     train_encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), arch_pool))
     valid_encoder_input = list(map(lambda x: utils.parse_arch_to_seq(x[0], 2) + utils.parse_arch_to_seq(x[1], 2), valid_arch_pool))
-    train_encoder_target = [np.random.random() for i in range(args.controller_seed_arch)]
-    valid_encoder_target = [np.random.random() for i in range(100)]
+    train_encoder_target = [
+        np.random.random() for _ in range(args.controller_seed_arch)
+    ]
+    valid_encoder_target = [np.random.random() for _ in range(100)]
     nao = NAO(
         args.controller_encoder_layers,
         args.controller_encoder_vocab_size,

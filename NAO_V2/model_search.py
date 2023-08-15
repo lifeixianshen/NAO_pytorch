@@ -18,20 +18,18 @@ class Node(nn.Module):
         self.steps = steps
         self.x_op = nn.ModuleList()
         self.y_op = nn.ModuleList()
-        
+
         num_possible_inputs = node_id + 2
-        
-        if search_space == 'small':
-            OPERATIONS = OPERATIONS_search_small
-        elif search_space == 'middle':
+
+        if search_space == 'middle':
             OPERATIONS = OPERATIONS_search_middle
         else:
             OPERATIONS = OPERATIONS_search_small
-        
+
         for k, v in OPERATIONS.items():
             self.x_op.append(v(num_possible_inputs, channels, channels, stride, True))
             self.y_op.append(v(num_possible_inputs, channels, channels, stride, True))
- 
+
         self.out_shape = [prev_layers[0][0]//stride, prev_layers[0][1]//stride, channels]
         
     def forward(self, x, x_id, x_op, y, y_id, y_op, step, bn_train=False):
@@ -73,7 +71,7 @@ class Cell(nn.Module):
         self.drop_path_keep_prob = drop_path_keep_prob
         self.ops = nn.ModuleList()
         self.nodes = nodes
-        
+
         # maybe calibrate size
         prev_layers = [list(prev_layers[0]), list(prev_layers[1])]
         self.maybe_calibrate_size = MaybeCalibrateSize(prev_layers, channels)
@@ -84,13 +82,13 @@ class Cell(nn.Module):
             node = Node(search_space, prev_layers, channels, stride, drop_path_keep_prob, i, layer_id, layers, steps)
             self.ops.append(node)
             prev_layers.append(node.out_shape)
-        out_hw = min([shape[0] for i, shape in enumerate(prev_layers)])
+        out_hw = min(shape[0] for shape in prev_layers)
 
         if reduction:
             self.fac_1 = FactorizedReduce(prev_layers[0][-1], channels, prev_layers[0])
             self.fac_2 = FactorizedReduce(prev_layers[1][-1], channels, prev_layers[1])
         self.final_combine_conv = WSReLUConvBN(self.nodes+2, channels, channels, 1)
-        
+
         self.out_shape = [out_hw, out_hw, channels]
         
     def forward(self, s0, s1, arch, step, bn_train=False):
@@ -103,11 +101,7 @@ class Cell(nn.Module):
             used[y_id] += 1
             out = self.ops[i](states[x_id], x_id, x_op, states[y_id], y_id, y_op, step, bn_train=bn_train)
             states.append(out)
-        concat = []
-        for i, c in enumerate(used):
-            if used[i] == 0:
-                concat.append(i)
-        
+        concat = [i for i, c in enumerate(used) if used[i] == 0]
         # Notice that in reduction cell, 0, 1 might be concated and they might have to be factorized
         if self.reduction:
             if 0 in concat:
@@ -212,13 +206,13 @@ class NASWSNetworkImageNet(nn.Module):
         self.drop_path_keep_prob = drop_path_keep_prob
         self.use_aux_head = use_aux_head
         self.steps = steps
-        
+
         self.pool_layers = [self.layers, 2 * self.layers + 1]
         self.total_layers = self.layers * 3 + 2
-        
+
         if self.use_aux_head:
             self.aux_head_index = self.pool_layers[-1]
-        
+
         channels = self.channels
         self.stem0 = nn.Sequential(
             nn.Conv2d(3, channels // 2, 3, stride=2, padding=1, bias=False),
@@ -227,34 +221,33 @@ class NASWSNetworkImageNet(nn.Module):
             nn.Conv2d(channels // 2, channels, 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(channels // 2),
         )
-        
+
         self.stem1 = nn.Sequential(
             nn.ReLU(inplace=False),
             nn.Conv2d(channels, channels, 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(channels),
         )
-        
+
         outs = [[112, 112, channels // 2], [56, 56, channels]]
         self.cells = nn.ModuleList()
         for i in range(self.total_layers):
             if i not in self.pool_layers:
                 cell = Cell(self.search_space, outs, self.nodes, channels, False, i, self.total_layers, self.steps,
                             self.drop_path_keep_prob)
-                outs = [outs[-1], cell.out_shape]
             else:
                 channels *= 2
                 cell = Cell(self.search_space, outs, self.nodes, channels, True, i, self.total_layers, self.steps,
                             self.drop_path_keep_prob)
-                outs = [outs[-1], cell.out_shape]
+            outs = [outs[-1], cell.out_shape]
             self.cells.append(cell)
-            
+
             if self.use_aux_head and i == self.aux_head_index:
                 self.auxiliary_head = AuxHeadImageNet(outs[-1][-1], classes)
-        
+
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(1 - self.keep_prob)
         self.classifier = nn.Linear(outs[-1][-1], classes)
-        
+
         self.init_parameters()
     
     def init_parameters(self):

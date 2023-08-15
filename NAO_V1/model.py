@@ -160,8 +160,7 @@ class Node(nn.Module):
             y = self.y_id_fact_reduce(y)
         if self.y_id not in [4, 5] and self.drop_path_keep_prob is not None and self.training:
             y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
-        out = x + y
-        return out
+        return x + y
     
 
 class Cell(nn.Module):
@@ -178,7 +177,7 @@ class Cell(nn.Module):
         self.ops = nn.ModuleList()
         self.nodes = len(arch) // 4
         self.used = [0] * (self.nodes + 2)
-        
+
         # maybe calibrate size
         prev_layers = [list(prev_layers[0]), list(prev_layers[1])]
         self.maybe_calibrate_size = MaybeCalibrateSize(prev_layers, channels)
@@ -193,9 +192,11 @@ class Cell(nn.Module):
             self.used[x_id] += 1
             self.used[y_id] += 1
             prev_layers.append(node.out_shape)
-        
+
         self.concat = [i for i in range(self.nodes+2) if self.used[i] == 0]
-        out_hw = min([shape[0] for i, shape in enumerate(prev_layers) if i in self.concat])
+        out_hw = min(
+            shape[0] for i, shape in enumerate(prev_layers) if i in self.concat
+        )
         self.final_combine = FinalCombine(prev_layers, out_hw, channels, self.concat)
         self.out_shape = [out_hw, out_hw, channels * len(self.concat)]
     

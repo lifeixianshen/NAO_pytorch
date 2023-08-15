@@ -28,13 +28,11 @@ class Node(nn.Module):
         self.y_op_id = y_op
         x_shape = list(x_shape)
         y_shape = list(y_shape)
-        
-        if search_space == 'small':
-            OPERATIONS = OPERATIONS_small
+
+        if search_space == 'large':
+            OPERATIONS = OPERATIONS_large
         elif search_space == 'middle':
             OPERATIONS = OPERATIONS_middle
-        elif search_space == 'large':
-            OPERATIONS = OPERATIONS_large
         else:
             OPERATIONS = OPERATIONS_small
 
@@ -45,7 +43,7 @@ class Node(nn.Module):
         y_stride = stride if y_id in [0, 1] else 1
         self.y_op = OPERATIONS[y_op](channels, channels, y_stride, y_shape, True)
         y_shape = [y_shape[0] // y_stride, y_shape[1] // y_stride, channels]
-        
+
         assert x_shape[0] == y_shape[0] and x_shape[1] == y_shape[1]
         self.out_shape = list(x_shape)
         
@@ -54,28 +52,27 @@ class Node(nn.Module):
         y = self.y_op(y)
         X_DROP = False
         Y_DROP = False
-        if self.search_space == 'small':
-            if self.x_id not in [4] and self.drop_path_keep_prob is not None and self.training:
-                X_DROP = True
-            if self.y_id not in [4] and self.drop_path_keep_prob is not None and self.training:
-                Y_DROP = True
-        elif self.search_space == 'middle':
-            if self.x_id not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
-                X_DROP = True
-            if self.y_id not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
-                Y_DROP = True
-        elif self.search_space == 'large':
+        if self.search_space == 'large':
             if self.x_id not in [0] and self.drop_path_keep_prob is not None and self.training:
                 X_DROP = True
             if self.y_id not in [0] and self.drop_path_keep_prob is not None and self.training:
                 Y_DROP = True        
 
+        elif self.search_space == 'middle':
+            if self.x_id not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
+                X_DROP = True
+            if self.y_id not in [0, 1] and self.drop_path_keep_prob is not None and self.training:
+                Y_DROP = True
+        elif self.search_space == 'small':
+            if self.x_id not in [4] and self.drop_path_keep_prob is not None and self.training:
+                X_DROP = True
+            if self.y_id not in [4] and self.drop_path_keep_prob is not None and self.training:
+                Y_DROP = True
         if X_DROP:
             x = apply_drop_path(x, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
         if Y_DROP:
             y = apply_drop_path(y, self.drop_path_keep_prob, self.layer_id, self.layers, step, self.steps)
-        out = x + y
-        return out
+        return x + y
     
 
 class Cell(nn.Module):
@@ -93,7 +90,7 @@ class Cell(nn.Module):
         self.ops = nn.ModuleList()
         self.nodes = len(arch) // 4
         self.used = [0] * (self.nodes + 2)
-        
+
         # maybe calibrate size
         prev_layers = [list(prev_layers[0]), list(prev_layers[1])]
         self.maybe_calibrate_size = MaybeCalibrateSize(prev_layers, channels)
@@ -108,9 +105,11 @@ class Cell(nn.Module):
             self.used[x_id] += 1
             self.used[y_id] += 1
             prev_layers.append(node.out_shape)
-        
+
         self.concat = [i for i in range(self.nodes+2) if self.used[i] == 0]
-        out_hw = min([shape[0] for i, shape in enumerate(prev_layers) if i in self.concat])
+        out_hw = min(
+            shape[0] for i, shape in enumerate(prev_layers) if i in self.concat
+        )
         self.final_combine = FinalCombine(prev_layers, out_hw, channels, self.concat)
         self.out_shape = [out_hw, out_hw, channels * len(self.concat)]
     
